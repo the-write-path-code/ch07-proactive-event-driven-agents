@@ -1,4 +1,4 @@
-# YTI Homecare — Privacy & Architecture Design
+# Privacy & Architecture Design
 
 This document details the architecture of the Agentic Staffing Dashboard, focusing on how we maintain strong data privacy (PII/PHI protection) while enabling advanced AI and spatial features.
 
