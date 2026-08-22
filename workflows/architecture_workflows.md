@@ -5,10 +5,21 @@ This document provides a comprehensive visual and technical reference for all op
 ---
 
 ## 📑 Table of Contents
-1. [Data Ingestion & Privacy ETL Pipeline](#1-data-ingestion--privacy-etl-pipeline)
-2. [Agent Orchestration & Deterministic Tool Routing](#2-agent-orchestration--deterministic-tool-routing)
-3. [Privacy Map Rendering & Event Loop](#3-privacy-map-rendering--event-loop)
-4. [Telemetry, Tracing & Audit Trail](#4-telemetry-tracing--audit-trail)
+1. [Core Architectural & Privacy Principles](#-core-architectural--privacy-principles)
+2. [Data Ingestion & Privacy ETL Pipeline](#1-data-ingestion--privacy-etl-pipeline)
+3. [Agent Orchestration & Deterministic Tool Routing](#2-agent-orchestration--deterministic-tool-routing)
+4. [Privacy Map Rendering & Event Loop](#3-privacy-map-rendering--event-loop)
+5. [Telemetry, Tracing & Audit Trail](#4-telemetry-tracing--audit-trail)
+
+---
+
+## 🛡️ Core Architectural & Privacy Principles
+
+1. **No Raw Coordinates in Database:** Exact GPS coordinates are considered highly sensitive. They exist only transiently in memory during ingestion and are permanently discarded. The database only stores Uber H3 hexagonal indices (Resolution 8).
+2. **Minimal PII Retention:** Addresses, ZIP codes, and birth dates are strictly purged from the database after geographical indexing and hashing steps are complete.
+3. **Opaque Hashing for Sync:** To sync Excel updates without storing addresses, the system computes deterministic SHA-256 hashes of the `Name + Address` string (`_match_hash`).
+4. **LLM Sandboxing:** The AI (Google Gemini via Google ADK) never executes raw SQL and never sees the whole database. It only receives targeted, minimized contextual data returned by strictly defined Python tools.
+5. **Deterministic Map Control:** The map UI never relies on the LLM to output structured JSON to reposition the map. Instead, it uses a deterministic "Side-Channel" written directly by Python tools during execution.
 
 ---
 
@@ -95,6 +106,48 @@ flowchart LR
 
 The AI Staffing Assistant bridges conversational queries from the Director of Nursing (DON) to the secured SQLite database using **Google ADK** (Agent Development Kit) with deterministic tool execution.
 
+### Runtime Interaction Sequence
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Streamlit (UI)
+    participant ADK as Agent (ADK Tools)
+    participant LLM as Google Gemini
+    participant DB as Secure DB (SQLite)
+
+    User->>UI: "Find PCAs near Claire Ferguson"
+    UI->>ADK: ask_agent(query, session_context)
+
+    ADK->>LLM: Text Query + Tool Signatures
+
+    LLM-->>ADK: Tool Call: lookup_client(name="Claire Ferguson")
+    ADK->>DB: Query Client logic
+    DB-->>ADK: Client C001, H3 Index: 882a...
+    ADK-->>LLM: Text Result: Client C001 found at index 882a...
+
+    LLM-->>ADK: Tool Call: find_nearby_staff(client="C001", radius=10, role="PCA")
+
+    activate ADK
+    ADK->>DB: Query PCAs within grid_distance <= K
+    DB-->>ADK: Return 2 PCAs
+
+    note right of ADK: 🔒 SIDE-CHANNEL WRITE<br>Record `{"client_name": "Claire", "radius": 10}`<br>into local AGENT_CONTEXT memory.
+
+    ADK-->>LLM: Text Result: Found 2 PCAs...
+    deactivate ADK
+
+    LLM-->>ADK: Final Response: "I found 2 PCAs near Claire..."
+
+    ADK-->>UI: {"answer": "I found...", "context": {"map_update": {...}}}
+
+    note left of UI: Read context dictionary<br>Update st.session_state params
+    UI->>UI: st.rerun() (Map redraws on Claire)
+    UI->>User: Display Chat Answer + Centered Map
+```
+
+### Tool Execution Flowchart
+
 ```mermaid
 flowchart TD
     Start([User Chat Input]) --> App[Streamlit UI ask_agent]
@@ -155,6 +208,10 @@ flowchart TD
 4. **Deterministic Side-Channel Map State**:
    - As Python tools execute, they write targeted spatial state (`client_id`, `radius`, `matched_staff_ids`) into a local `AGENT_CONTEXT` side-channel dictionary.
    - The UI updates its map directly from this side channel, completely preventing LLM hallucination of coordinates, distances, or names.
+
+5. **Why the Side-Channel Matters**:
+   - If the system relied on the LLM to emit formatted JSON to control the UI, the LLM could hallucinate client names, invent radii, or output malformed syntax that crashes the app.
+   - By having deterministic Python tools (`find_nearby_staff`) write directly to `AGENT_CONTEXT` *while executing*, the map reflects the exact database query ground truth. The LLM never touches map rendering parameters.
 
 ---
 
