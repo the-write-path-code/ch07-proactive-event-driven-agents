@@ -107,11 +107,11 @@ Chat naturally with the agent:
 
 ## 📊 Workflows
 
-Detailed Mermaid diagrams available in [`workflows/`](./workflows/):
-- 🏗️ **[ETL Pipeline Workflow](./workflows/etl_pipeline.md)** — Secure address to H3 index ingestion
-- 🔄 **[Agent Orchestration](./workflows/agent_orchestration.md)** — ADK tool routing and context side channels
-- 🔍 **[Privacy Mapping](./workflows/privacy_mapping.md)** — Folium hex map generation without raw coordinates
-
+Detailed Mermaid diagrams and lifecycle specifications are documented in [`workflows/architecture_workflows.md`](./workflows/architecture_workflows.md):
+- 🏗️ **[Data Ingestion & Privacy ETL Pipeline](./workflows/architecture_workflows.md#1-data-ingestion--privacy-etl-pipeline)** — Secure address to H3 index ingestion
+- 🔄 **[Agent Orchestration & Deterministic Tool Routing](./workflows/architecture_workflows.md#2-agent-orchestration--deterministic-tool-routing)** — ADK tool routing and context side channels
+- 🔍 **[Privacy Map Rendering & Event Loop](./workflows/architecture_workflows.md#3-privacy-map-rendering--event-loop)** — Folium hex map generation without raw coordinates
+- 📈 **[Telemetry, Tracing & Audit Trail](./workflows/architecture_workflows.md#4-telemetry-tracing--audit-trail)** — Opik distributed tracing and Loguru logging
 
 ## ⚙️ Configuration
 
@@ -138,7 +138,7 @@ ch7-proactive-event-driven-agents/
 │   └── logger.py         # 📝 Loguru centralized configuration
 ├── 🛠️ etl/
 │   └── sync.py           # 🔄 ETL pipeline (Excel → Geocodio → H3 → SQLite)
-├── 📚 workflows/         # 📖 Architecture docs + Mermaid diagrams
+├── 📚 workflows/         # 📖 System workflows + Mermaid diagrams (architecture_workflows.md)
 ├── 📂 data/              # 📥 Target for CustomerData & CaregiverData Excel drops
 ├── 📂 logs/              # 📝 Rotating daily log storage
 ├── .env.example          # 🔐 Config template
