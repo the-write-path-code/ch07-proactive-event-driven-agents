@@ -262,10 +262,6 @@ Observability spans user requests, ADK agent tool routing, and external API inte
 ```mermaid
 %%{init: {"themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
 flowchart TB
-    classDef flow fill:#E8F1FB,stroke:#2F5597,color:#111827,stroke-width:1.5px
-    classDef state fill:#F3E8FF,stroke:#7E57C2,color:#111827,stroke-width:1.5px
-    classDef telemetry fill:#FFF4D6,stroke:#B7791F,color:#111827,stroke-width:1.5px
-    classDef gap fill:#FDE8E7,stroke:#C62828,color:#111827,stroke-width:1.5px,stroke-dasharray: 5 4
 
     subgraph A["Implemented Request and Telemetry Path"]
         direction TB
