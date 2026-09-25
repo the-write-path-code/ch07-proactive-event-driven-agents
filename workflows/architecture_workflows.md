@@ -28,6 +28,7 @@ This document provides a comprehensive visual and technical reference for all op
 The Data Synchronization Pipeline (ETL) ingests raw Excel exports from the agency management system, verifies schema integrity, geocodes addresses incrementally, and writes privacy-safe Uber H3 spatial indices to the local SQLite database.
 
 ```mermaid
+%%{init: {"theme": "neutral", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
 flowchart LR
     subgraph P1["1. Ingest and Validate"]
         direction TB
@@ -68,12 +69,6 @@ flowchart LR
     P2 --> P3
     P3 --> P4
 
-    style Start fill:#e1f5e1
-    style End fill:#e1f5e1
-    style Abort fill:#ffe6e6
-    style CallGeocodio fill:#e6f3ff
-    style H3Conversion fill:#f0e6ff
-    style Discard fill:#ffe6e6
 ```
 
 ### Key Components
@@ -109,6 +104,7 @@ The AI Staffing Assistant bridges conversational queries from the Director of Nu
 ### Runtime Interaction Sequence
 
 ```mermaid
+%%{init: {"theme": "neutral", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
 sequenceDiagram
     participant User
     participant UI as Streamlit (UI)
@@ -149,6 +145,7 @@ sequenceDiagram
 ### Tool Execution Flowchart
 
 ```mermaid
+%%{init: {"theme": "neutral", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
 flowchart TD
     Start([User Chat Input]) --> App[Streamlit UI ask_agent]
 
@@ -180,13 +177,6 @@ flowchart TD
 
     Compose --> Output([Markdown Chat Response])
 
-    style Start fill:#e1f5e1
-    style Output fill:#e1f5e1
-    style App fill:#fff4e6
-    style ADK fill:#e6f3ff
-    style ToolContext fill:#ffe6e6
-    style UpdateUI fill:#e6e6fa
-    style Compose fill:#f0e6ff
 ```
 
 ### Key Components
@@ -220,6 +210,7 @@ flowchart TD
 The map visualization displays spatial proximity and staff capacity using obfuscated H3 polygons instead of pin-point GPS markers, keeping all PII rendering strictly client-side.
 
 ```mermaid
+%%{init: {"theme": "neutral", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
 flowchart TD
     Start([Side Channel Update from Agent System]) --> ReadDict[Read AGENT_CONTEXT for Staff IDs]
 
@@ -243,10 +234,6 @@ flowchart TD
 
     Override --> Start
 
-    style Start fill:#e1f5e1
-    style SyncState fill:#e6f3ff
-    style MapHex fill:#f0e6ff
-    style ClickMap fill:#fff4e6
 ```
 
 ### Key Components
@@ -273,6 +260,7 @@ flowchart TD
 Observability spans user requests, ADK agent tool routing, and external API interactions, providing operational traceability while maintaining patient data isolation.
 
 ```mermaid
+%%{init: {"themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
 flowchart TB
     classDef flow fill:#E8F1FB,stroke:#2F5597,color:#111827,stroke-width:1.5px
     classDef state fill:#F3E8FF,stroke:#7E57C2,color:#111827,stroke-width:1.5px
