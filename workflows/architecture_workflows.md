@@ -28,37 +28,58 @@ This document provides a comprehensive visual and technical reference for all op
 The Data Synchronization Pipeline (ETL) ingests raw Excel exports from the agency management system, verifies schema integrity, geocodes addresses incrementally, and writes privacy-safe Uber H3 spatial indices to the local SQLite database.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "30px", "primaryTextColor": "#000000", "lineColor": "#4B5563"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "44px", "primaryTextColor": "#000000", "lineColor": "#4B5563"}}}%%
 flowchart LR
-    subgraph Col1 ["Phase 1 & 2: Ingestion & Changes"]
+    subgraph P1 ["1. Ingest and Validate"]
         direction TB
-        R1["<b>1. Ingestion</b><br/>CustomerData.xlsx &<br/>CaregiverData.xlsx"]
-        R2["<b>2. Validation & Scrubbing</b><br/>Enforce required columns<br/>Drop extraneous PII"]
-        R3["<b>3. Surrogate Key</b><br/>Compute SHA-256<br/>_match_hash string"]
-        R4["<b>4. Change Detection</b><br/>Compare _match_hash<br/>with existing SQLite DB"]
-        R1 --> R2 --> R3 --> R4
+        Start([Manual Trigger or App Boot]) --> ReadExcel["Read CustomerData.xlsx<br/>and CaregiverData.xlsx"]
+        ReadExcel --> Validate{Validate Required<br/>Columns}
+        Validate -->|Missing| Abort([Abort Sync<br/>Show UI Error])
+        Validate -->|Valid| FillOptional["Fill Missing Optional<br/>Columns with NA"]
+        FillOptional --> Exclusions["Apply Hardcoded<br/>Name Exclusions"]
+        Exclusions --> SurrogateKey["Compute Secure Hash<br/>Keys for Changes"]
     end
 
-    subgraph Col2 ["Phase 3 & 4: Privacy & Rebuild"]
+    subgraph P2 ["2. Change Detection"]
         direction TB
-        R5["<b>5. Geocoding Cache</b><br/>Check local cache or<br/>query Geocodio API"]
-        R6["<b>6. Spatial Indexing</b><br/>Convert coordinates to<br/>Uber H3 Res 8 (~0.73 km²)"]
-        R7["<b>7. Discard Raw Coords</b><br/>Purge Lat/Lng & street<br/>addresses permanently"]
-        R8["<b>8. SQLite DB Rebuild</b><br/>Commit clients & staff<br/>Rebuild vw_staff_capacity"]
-        R5 --> R6 --> R7 --> R8
+        Compare{Compare with<br/>Existing DB}
+        Compare -->|New or Address Changed| GeocodeQueue["Add to<br/>Geocoding Queue"]
+        Compare -->|No Address Change| Preserve["Preserve Existing<br/>H3 Index"]
     end
 
-    Col1 -->|"New / Changed"| Col2
+    subgraph P3 ["3. Geocoding Pipeline"]
+        direction TB
+        CheckCache{Check Local<br/>Geocode Cache}
+        CheckCache -->|Cached| FetchCache["Fetch Cached<br/>Lat / Lng"]
+        CheckCache -->|Not Cached| CallGeocodio["Batch Call Geocodio API<br/>(Address ONLY)"]
+        CallGeocodio --> SaveCache["Save Lat / Lng<br/>to Cache"]
+        SaveCache --> FetchCache
+        FetchCache --> H3Conversion["Convert to Uber H3 Res 8<br/>(~0.73 km² Hexagons)"]
+        H3Conversion --> Discard["Discard Raw Coordinates<br/>(Never Store Lat/Lng)"]
+    end
 
-    classDef proc fill:#EBF5FF,stroke:#2563EB,color:#000000,stroke-width:1.5px
-    classDef check fill:#FEF9C3,stroke:#CA8A04,color:#000000,stroke-width:1.5px
-    classDef purge fill:#FEE2E2,stroke:#DC2626,color:#000000,stroke-width:1.5px
-    classDef db fill:#DCFCE7,stroke:#15803D,color:#000000,stroke-width:1.5px
+    subgraph P4 ["4. Database Rebuild"]
+        direction TB
+        RebuildDB["Rebuild SQLite Tables<br/>(clients & staff)"]
+        RebuildDB --> RebuildView["Rebuild vw_staff_capacity<br/>(Calculate Available Hours)"]
+        RebuildView --> End([Sync Complete<br/>Update UI Summary])
+    end
 
-    class R1,R3,R5,R6 proc
-    class R2,R4 check
-    class R7 purge
-    class R8 db
+    P1 --> P2
+    P2 --> P3
+    P3 --> P4
+
+    classDef inputNode fill:#EBF5FF,stroke:#2563EB,color:#000000,stroke-width:2px
+    classDef checkNode fill:#FEF9C3,stroke:#CA8A04,color:#000000,stroke-width:2px
+    classDef procNode fill:#EDE9FE,stroke:#7C3AED,color:#000000,stroke-width:2px
+    classDef purgeNode fill:#FEE2E2,stroke:#DC2626,color:#000000,stroke-width:2px
+    classDef dbNode fill:#DCFCE7,stroke:#15803D,color:#000000,stroke-width:2px
+
+    class Start,ReadExcel,FillOptional,Exclusions,SurrogateKey inputNode
+    class Validate,Compare,CheckCache,Preserve checkNode
+    class GeocodeQueue,CallGeocodio,SaveCache,FetchCache,H3Conversion procNode
+    class Discard,Abort purgeNode
+    class RebuildDB,RebuildView,End dbNode
 ```
 
 ### Key Components
