@@ -1,28 +1,30 @@
 ## Figure 7.1
 
 ```mermaid
-%%{init: {"theme": "neutral", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "18px", "primaryTextColor": "#000000", "lineColor": "#4B5563"}}}%%
 flowchart TD
-    CUST["CustomerData.xlsx"]:::nodeStyle
-    CAREGIVER["CaregiverData.xlsx"]:::nodeStyle
+    CUST["CustomerData.xlsx<br/>(Client Records)"] --> PROC["ETL Ingestion Pipeline<br/>(Validate Schema & Filter Exclusions)"]
+    CAREGIVER["CaregiverData.xlsx<br/>(Staff Records)"] --> PROC
 
-    subgraph ETL ["ETL Memory (Transient)"]
-        ETL_PROC["ETL Process"]:::nodeStyle
-        COMP["Compare with DB Hashes"]:::nodeStyle
-        GEO["Geocodio API"]:::nodeStyle
-        H3["Convert to H3 Index"]:::nodeStyle
-        PURGE{"Drop Address, DOB, etc."}:::nodeStyle
+    PROC --> COMP{"Compare _match_hash<br/>with Existing DB"}
 
-        ETL_PROC -->|"1. Check _match_hash"| COMP
-        COMP -->|"2. If New/Changed Address"| GEO
-        GEO -->|"Lat/Lng"| H3
-        H3 -->|"3. Purge PII"| PURGE
-    end
+    COMP -->|"Address Changed / New"| GEO["Geocodio API Lookup<br/>→ Convert to H3 Res 8"]
+    COMP -->|"Unchanged"| PRESERVE["Preserve Existing<br/>H3 Hexagon"]
 
-    CUST --> ETL_PROC
-    CAREGIVER --> ETL_PROC
+    GEO --> PURGE["Discard Raw Coordinates<br/>& Purge Address / DOB"]
+    PRESERVE --> PURGE
 
-    DB[("Secure SQLite DB")]:::dbStyle
-    PURGE -->|"4. Save to DB"| DB
+    PURGE --> DB[("Secure SQLite Database<br/>(staffing_engine_secure.db)")]
 
+    classDef input fill:#EBF5FF,stroke:#2563EB,color:#000000,stroke-width:1.5px
+    classDef proc fill:#EDE9FE,stroke:#7C3AED,color:#000000,stroke-width:1.5px
+    classDef check fill:#FEF9C3,stroke:#CA8A04,color:#000000,stroke-width:1.5px
+    classDef purge fill:#FEE2E2,stroke:#DC2626,color:#000000,stroke-width:1.5px
+    classDef db fill:#DCFCE7,stroke:#15803D,color:#000000,stroke-width:1.5px
+
+    class CUST,CAREGIVER input
+    class PROC,GEO,PRESERVE proc
+    class COMP check
+    class PURGE purge
+    class DB db
 ```

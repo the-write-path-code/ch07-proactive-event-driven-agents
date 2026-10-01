@@ -28,47 +28,37 @@ This document provides a comprehensive visual and technical reference for all op
 The Data Synchronization Pipeline (ETL) ingests raw Excel exports from the agency management system, verifies schema integrity, geocodes addresses incrementally, and writes privacy-safe Uber H3 spatial indices to the local SQLite database.
 
 ```mermaid
-%%{init: {"theme": "neutral", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "30px", "primaryTextColor": "#000000", "lineColor": "#4B5563"}}}%%
 flowchart LR
-    subgraph P1["1. Ingest and Validate"]
+    subgraph Col1 ["Phase 1 & 2: Ingestion & Changes"]
         direction TB
-        Start([Manual Trigger or App Boot]) --> ReadExcel[Read CustomerData.xlsx and CaregiverData.xlsx]
-        ReadExcel --> Validate{Validate Required Columns}
-        Validate -->|Missing| Abort([Abort Sync Show Error in UI])
-        Validate -->|Valid| FillOptional[Fill Missing Optional Columns with NA]
-        FillOptional --> Exclusions[Apply Hardcoded Name Exclusions]
-        Exclusions --> SurrogateKey[Compute Secure Hash Keys for Changes]
+        R1["<b>1. Ingestion</b><br/>CustomerData.xlsx &<br/>CaregiverData.xlsx"]
+        R2["<b>2. Validation & Scrubbing</b><br/>Enforce required columns<br/>Drop extraneous PII"]
+        R3["<b>3. Surrogate Key</b><br/>Compute SHA-256<br/>_match_hash string"]
+        R4["<b>4. Change Detection</b><br/>Compare _match_hash<br/>with existing SQLite DB"]
+        R1 --> R2 --> R3 --> R4
     end
 
-    subgraph P2["2. Change Detection"]
+    subgraph Col2 ["Phase 3 & 4: Privacy & Rebuild"]
         direction TB
-        Compare{Compare with Existing DB}
-        Compare -->|New or Address Changed| GeocodeQueue[Add to Geocoding Queue]
-        Compare -->|No Address Change| Preserve[Preserve Existing H3 Index]
+        R5["<b>5. Geocoding Cache</b><br/>Check local cache or<br/>query Geocodio API"]
+        R6["<b>6. Spatial Indexing</b><br/>Convert coordinates to<br/>Uber H3 Res 8 (~0.73 km²)"]
+        R7["<b>7. Discard Raw Coords</b><br/>Purge Lat/Lng & street<br/>addresses permanently"]
+        R8["<b>8. SQLite DB Rebuild</b><br/>Commit clients & staff<br/>Rebuild vw_staff_capacity"]
+        R5 --> R6 --> R7 --> R8
     end
 
-    subgraph P3["3. Geocoding Pipeline"]
-        direction TB
-        CheckCache{Check Local Geocode Cache}
-        CheckCache -->|Cached| FetchCache[Fetch Cached Lat Lng]
-        CheckCache -->|Not Cached| CallGeocodio[Batch Call Geocodio API Address ONLY]
-        CallGeocodio --> SaveCache[Save Lat Lng to Cache]
-        SaveCache --> FetchCache
-        FetchCache --> H3Conversion[Convert to H3 Hex Index Res 8]
-        H3Conversion --> Discard[Discard Raw Coordinates Never Store Lat Lng]
-    end
+    Col1 -->|"New / Changed"| Col2
 
-    subgraph P4["4. Database Rebuild"]
-        direction TB
-        RebuildDB[Rebuild SQLite Tables clients and staff]
-        RebuildDB --> RebuildView[Rebuild vw_staff_capacity Calculating Available Hours]
-        RebuildView --> End([Sync Complete Update UI Summary])
-    end
+    classDef proc fill:#EBF5FF,stroke:#2563EB,color:#000000,stroke-width:1.5px
+    classDef check fill:#FEF9C3,stroke:#CA8A04,color:#000000,stroke-width:1.5px
+    classDef purge fill:#FEE2E2,stroke:#DC2626,color:#000000,stroke-width:1.5px
+    classDef db fill:#DCFCE7,stroke:#15803D,color:#000000,stroke-width:1.5px
 
-    P1 --> P2
-    P2 --> P3
-    P3 --> P4
-
+    class R1,R3,R5,R6 proc
+    class R2,R4 check
+    class R7 purge
+    class R8 db
 ```
 
 ### Key Components
@@ -104,42 +94,36 @@ The AI Staffing Assistant bridges conversational queries from the Director of Nu
 ### Runtime Interaction Sequence
 
 ```mermaid
-%%{init: {"theme": "neutral", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "32px", "actorFontSize": "34px", "noteFontSize": "28px", "messageFontSize": "32px", "primaryTextColor": "#000000", "lineColor": "#4B5563"}}}%%
 sequenceDiagram
+    autonumber
     participant User
-    participant UI as Streamlit (UI)
-    participant ADK as Agent (ADK Tools)
-    participant LLM as Google Gemini
-    participant DB as Secure DB (SQLite)
+    participant UI as Streamlit UI
+    participant ADK as ADK Agent
+    participant LLM as Gemini LLM
+    participant DB as SQLite DB
 
-    User->>UI: "Find PCAs near Claire Ferguson"
-    UI->>ADK: ask_agent(query, session_context)
+    User->>UI: "Find PCAs near Claire"
+    UI->>ADK: ask_agent(query)
+    ADK->>LLM: Query + Tool Signatures
 
-    ADK->>LLM: Text Query + Tool Signatures
+    LLM-->>ADK: lookup_client("Claire")
+    ADK->>DB: Query Client C001
+    DB-->>ADK: H3 Index: 882a...
+    ADK-->>LLM: Found C001 @ 882a...
 
-    LLM-->>ADK: Tool Call: lookup_client(name="Claire Ferguson")
-    ADK->>DB: Query Client logic
-    DB-->>ADK: Client C001, H3 Index: 882a...
-    ADK-->>LLM: Text Result: Client C001 found at index 882a...
-
-    LLM-->>ADK: Tool Call: find_nearby_staff(client="C001", radius=10, role="PCA")
-
+    LLM-->>ADK: find_nearby_staff(C001, 10mi)
     activate ADK
-    ADK->>DB: Query PCAs within grid_distance <= K
+    ADK->>DB: Query grid_dist <= K
     DB-->>ADK: Return 2 PCAs
-
-    note right of ADK: 🔒 SIDE-CHANNEL WRITE<br>Record `{"client_name": "Claire", "radius": 10}`<br>into local AGENT_CONTEXT memory.
-
-    ADK-->>LLM: Text Result: Found 2 PCAs...
+    Note over ADK,DB: SIDE-CHANNEL WRITE:<br/>Record client & radius to<br/>local AGENT_CONTEXT memory
+    ADK-->>LLM: Found 2 PCAs
     deactivate ADK
 
-    LLM-->>ADK: Final Response: "I found 2 PCAs near Claire..."
-
-    ADK-->>UI: {"answer": "I found...", "context": {"map_update": {...}}}
-
-    note left of UI: Read context dictionary<br>Update st.session_state params
-    UI->>UI: st.rerun() (Map redraws on Claire)
-    UI->>User: Display Chat Answer + Centered Map
+    LLM-->>ADK: Synthesized Answer
+    ADK-->>UI: Answer + Context Payload
+    Note over UI: Read side-channel context &<br/>trigger st.rerun() for map redraw
+    UI->>User: Display Chat + Centered Map
 ```
 
 ### Tool Execution Flowchart
@@ -260,22 +244,21 @@ flowchart TD
 Observability spans user requests, ADK agent tool routing, and external API interactions, providing operational traceability while maintaining patient data isolation.
 
 ```mermaid
-%%{init: {"themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "11px", "actorFontSize": "11px", "noteFontSize": "10px", "messageFontSize": "10px"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif", "fontSize": "22px", "primaryTextColor": "#000000", "lineColor": "#4B5563"}}}%%
 flowchart TB
-
-    subgraph A["Implemented Request and Telemetry Path"]
+    subgraph A ["Implemented Request and Telemetry Path"]
         direction TB
-        U[User request]:::flow
-        A1[ask_agent]:::flow
-        A2[_ask_async and root_agent]:::flow
-        T[Local tools]:::flow
-        S[AGENT_CONTEXT and result context]:::state
-        UI[Streamlit map update]:::state
+        U["User Request"]
+        A1["ask_agent Entrypoint"]
+        A2["_ask_async & root_agent"]
+        T["Local Agent Tools"]
+        S["AGENT_CONTEXT Side-Channel"]
+        UI["Streamlit Map Update"]
 
         U --> A1 --> A2 --> T --> S --> UI
 
-        O[Opik tracking<br/>tool and orchestration boundaries]:::telemetry
-        L[Logging<br/>stdout INFO; file DEBUG]:::telemetry
+        O["Opik Distributed Tracing<br/>(Tool & Orchestration Spans)"]
+        L["Centralized Logging<br/>(stdout INFO / file DEBUG)"]
 
         A1 -.-> O
         A2 -.-> O
@@ -284,18 +267,28 @@ flowchart TB
         T -.-> L
     end
 
-    subgraph B["Production Audit & Compliance Readiness"]
+    subgraph B ["Production Audit & Compliance Readiness"]
         direction LR
-        G1[Inspect captured<br/>trace fields]:::gap
-        G2[Join events with a<br/>durable request ID]:::gap
-        G3[Define retention, access,<br/>redaction, and export]:::gap
-        G4[Replace shared state for<br/>overlapping requests]:::gap
+        G1["Inspect Captured<br/>Trace Fields"]
+        G2["Join Events with<br/>Durable Request ID"]
+        G3["Define Retention &<br/>Redaction Policies"]
+        G4["Isolate Shared State<br/>for Concurrency"]
     end
 
     O -.-> G1
     O -.-> G2
     L -.-> G3
     S -.-> G4
+
+    classDef flow fill:#EBF5FF,stroke:#2563EB,color:#000000,stroke-width:1.5px
+    classDef state fill:#FEF9C3,stroke:#CA8A04,color:#000000,stroke-width:1.5px
+    classDef telem fill:#EDE9FE,stroke:#7C3AED,color:#000000,stroke-width:1.5px
+    classDef audit fill:#DCFCE7,stroke:#15803D,color:#000000,stroke-width:1.5px
+
+    class U,A1,A2,T flow
+    class S,UI state
+    class O,L telem
+    class G1,G2,G3,G4 audit
 ```
 
 ### Key Components
