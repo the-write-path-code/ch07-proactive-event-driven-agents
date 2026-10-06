@@ -4,7 +4,7 @@ Companion code for *Building Safe Agentic AI for Enterprise Systems* by Mohit Ag
 
 This repository implements a privacy-preserving staffing dashboard for Directors of Nursing. It helps identify available caregivers near a client without placing raw client addresses, caregiver addresses, or exact coordinates in the language model's context.
 
-The system separates geographic processing from agent reasoning. An extract-transform-load (ETL) step geocodes source addresses, converts coordinates to H3 cells, and minimizes the retained data. Deterministic Python tools then calculate proximity and update the map through a side channel. The model can request a staffing query, but it cannot write SQL, retrieve raw locations, or drive the map from generated prose.
+The system separates geographic processing from agent reasoning. An extract-transform-load (ETL) step geocodes source addresses, converts coordinates to H3 cells, and minimizes the retained data. Deterministic Python tools then calculate proximity and update the map through a side channel. The model can request a staffing query, but it cannot write SQL, retrieve raw locations, or drive the map from generated prose. You can also explore the chapter's [interactive workflow diagrams](#architecture-and-workflow-diagrams) directly in your browser.
 
 ## What You Will Run
 
@@ -177,21 +177,31 @@ Run the test suite before changing the ETL pipeline, H3 resolution, retention ru
 │   └── sync.py                        # Address processing, H3 conversion, and SQLite sync
 ├── data/                              # Local input spreadsheets and generated database; keep sensitive inputs out of Git
 ├── logs/                              # Local application logs
-├── workflows/
-│   └── architecture_workflows.md      # Mermaid diagrams and lifecycle documentation
+├── workflow/                          # Interactive HTML architecture diagrams and companion workflow specifications
+│   ├── 01_privacy_etl_pipeline.html
+│   ├── 02_data_sync_lifecycle.html
+│   ├── 03_agent_orchestration_flow.html
+│   ├── 04_map_rendering_event_loop.html
+│   ├── 05_telemetry_audit_trail.html
+│   ├── Figure 7-1.md
+│   └── architecture_workflows.md
 └── tests/
 ```
 
-## Architecture Diagrams and Supporting Documents
+<a id="architecture-and-workflow-diagrams"></a>
+## Architecture and Workflow Diagrams
 
-The `workflows/architecture_workflows.md` document contains the diagrams used in Chapter 7:
+The `workflow/` directory contains interactive HTML diagrams alongside companion markdown documentation (`Figure 7-1.md`, `architecture_workflows.md`) detailing the privacy-preserving ETL pipeline, data sync lifecycle, agent tool routing, map side-channel event loop, and Opik telemetry audit trail explored in Chapter 7:
 
-- The address-to-H3 ETL flow and data minimization boundary.
-- Deterministic agent-tool routing.
-- The map side channel and Streamlit rendering path.
-- Tracing and audit flow.
+- [`01_privacy_etl_pipeline.html`](https://the-write-path-code.github.io/ch07-proactive-event-driven-agents/workflow/01_privacy_etl_pipeline.html) shows Figure 7.1 privacy-preserving ETL ingestion pipeline, address geocoding, Uber H3 Resolution 8 spatial indexing, raw coordinate purging, and secure SQLite persistence.
+- [`02_data_sync_lifecycle.html`](https://the-write-path-code.github.io/ch07-proactive-event-driven-agents/workflow/02_data_sync_lifecycle.html) shows the complete 4-stage data synchronization lifecycle across schema validation, change detection with SHA-256 surrogate keys, geocoding cache, and SQL capacity view rebuilds.
+- [`03_agent_orchestration_flow.html`](https://the-write-path-code.github.io/ch07-proactive-event-driven-agents/workflow/03_agent_orchestration_flow.html) shows Google ADK agent tool routing, deterministic `AGENT_CONTEXT` side-channel writes, H3 grid distance evaluation, and decoupling map rendering from LLM hallucinations.
+- [`04_map_rendering_event_loop.html`](https://the-write-path-code.github.io/ch07-proactive-event-driven-agents/workflow/04_map_rendering_event_loop.html) shows the privacy map rendering and bi-directional event loop with Folium hexagonal overlays, capacity heatmaps, distance-sorted tabular summaries, and click override state updates.
+- [`05_telemetry_audit_trail.html`](https://the-write-path-code.github.io/ch07-proactive-event-driven-agents/workflow/05_telemetry_audit_trail.html) shows the distributed tracing and logging architecture with Opik span instrumentation, Loguru dual-tier logging, durable UUID request correlation, and audit compliance controls.
 
-Read the data-ingestion diagram before changing field retention. The most important question is not whether a field is useful. It is whether the agent, database, user interface, or trace system actually needs that field after the geocoding step has finished.
+The interactive `.html` files in `workflow/` can be opened directly in your browser using the links above (hosted via GitHub Pages with pan, zoom, dark/light theme, and animation support), or opened locally in any modern browser.
+
+The design documents and companion markdown files in `workflow/` remain the authoritative source for exact prompt templates, schema definitions, model configurations, and database views.
 
 ## Safety and Operational Limits
 
